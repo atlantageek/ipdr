@@ -1,0 +1,27 @@
+
+02          ipversion
+15          message_id
+00          session_id
+00          message_flags
+00 00 00 41 message length
+00 10       request id
+
+-----------------------------------------------
+00          vendor id
+Session Block IPDR
+00          session id
+00          ignore me
+01 01 04 00  sessionName
+00          session Description
+--
+00 06 43 4d ack time interval
+2d 52 45 47 ack sequence interval
+------------------------------------------------
+00          session id
+00          ingore me
+00          session Name
+1b 44 4f 43 53 49 53 20 43 4d 2d 52 45 | 47 20 45 56 45 4e 54 20 53 45 53 53 49 4f 4e 00  session Description
+-----------------------------------------------------
+00 00 01 00  ack time interval
+00 00 c8 ?? ack sequence interval
+
