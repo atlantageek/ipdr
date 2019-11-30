@@ -147,11 +147,14 @@ type responseIdl struct {
 	//opaque dataRecord<>
 
 }
-type getSessionsIdl struct {
+// GetSessionsIdl : This command is the GetSessions
+type GetSessionsIdl struct {
 	RequestID uint16
 }
 
-type getSessionsResponseIdl struct {
+
+
+type GetSessionsResponseIdl struct {
 	RequestID         uint16
 	SessionBlockCount uint32 `struc:"uint32,sizeof=SessionBlocks"`
 	SessionBlocks     []sessionBlockIdl
@@ -220,15 +223,34 @@ func Connect(hdr IPDRStreamingHeaderIdl, details ConnectIdl) bytes.Buffer {
 	var result bytes.Buffer
 	struc.Pack(&bufhdr, &hdr)
 	struc.Pack(&bufdtls, &details)
-	fmt.Println(bufdtls)
 	result.Write(bufhdr.Bytes())
 	result.Write(bufdtls.Bytes())
 	return result
 
 }
+//GetSessions : Just GetSessions
+func GetSessions (hdr IPDRStreamingHeaderIdl, details GetSessionsIdl) bytes.Buffer {
+	var bufhdr bytes.Buffer
+	var bufdtls bytes.Buffer
+	var result bytes.Buffer
+	
+	struc.Pack(&bufhdr, &hdr)
+	struc.Pack(&bufdtls, &details)
+
+	result.Write(bufhdr.Bytes())
+	result.Write(bufdtls.Bytes())
+	return result
+}
+//Hdr : Just Hdr
+func Hdr (hdr IPDRStreamingHeaderIdl) bytes.Buffer {
+	var bufhdr bytes.Buffer
+	struc.Pack(&bufhdr, &hdr)
+	return bufhdr
+
+}
 
 //ParseMessageByType : Parses message by message type
-func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32) {
+func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32) interface{} {
 	switch messageID {
 	case 5:
 		fmt.Println("CONNECT")
@@ -307,7 +329,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		fmt.Println("RESPONSE")
 	case 0x14:
 		fmt.Println("GET Sessions")
-		var dataObj getSessionsIdl
+		var dataObj GetSessionsIdl
 
 		err := struc.Unpack(packet, &dataObj)
 		if err != nil {
@@ -319,7 +341,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 	case 0x15:
 
 		fmt.Println("Get Sessions Response")
-		var dataObj getSessionsResponseIdl
+		var dataObj GetSessionsResponseIdl
 
 		err := struc.Unpack(packet, &dataObj)
 		if err != nil {
@@ -328,6 +350,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 			fmt.Println(dataObj)
 		}
 		fmt.Println(dataObj)
+		return dataObj
 
 	case 0x16:
 		fmt.Println("Get Templates")
@@ -336,6 +359,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 	case 0x40:
 		//fmt.Println("Keep Alive")
 	}
+	return nil
 }
 
 // func main() {
