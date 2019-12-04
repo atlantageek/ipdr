@@ -271,6 +271,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		} else {
 			fmt.Println(connectResponseObj)
 		}
+		return connectResponseObj
 	case 7:
 		fmt.Println("Disconnect")
 	case 0x23:

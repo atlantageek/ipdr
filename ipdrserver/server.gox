@@ -9,9 +9,10 @@ import (
 	"net"
 	"strconv"
 	"strings"
-
+	"github.com/prprprus/scheduler"
 	"github.com/lunixbochs/struc"
-	//"os"
+	"runtime"
+	"time"
 )
 
 const currentVersion = "0.01"
@@ -66,18 +67,10 @@ func connect(conn net.Conn) bool {
 	result := ipdrlib.Connect(hdrObj, connectObj)
 	conn.Write(result.Bytes())
 	//Load Header
-	response := make([]byte, 8)
-	var hdr ipdrlib.IPDRStreamingHeaderIdl
+	responseObj, messageID := getResponse(conn)
+	fmt.Println( responseObj.(ipdrlib.ConnectResponseIdl).KeepAliveInterval)
 
-	r := bufio.NewReader(conn)
-	io.ReadFull(r, response)
-	struc.Unpack(bytes.NewBuffer(response), &hdr)
-
-	var remainingMsgLen = hdr.MessageLen - 8
-	response2 := make([]byte, remainingMsgLen)
-	io.ReadFull(r, response2)
-	ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
-	if hdr.MessageID == 6 {
+	if messageID == 6 {
 		return true
 	} else {
 		return false
@@ -101,19 +94,9 @@ func getSessions(conn net.Conn) []uint8 {
 	fmt.Println(result)
 	conn.Write(result.Bytes())
 	//Load Header
-	response := make([]byte, 8)
-	fmt.Println(response)
-	var hdr ipdrlib.IPDRStreamingHeaderIdl
-	r := bufio.NewReader(conn)
-	io.ReadFull(r, response)
-	struc.Unpack(bytes.NewBuffer(response), &hdr)
-	fmt.Println(hdr)
-	var remainingMsgLen = hdr.MessageLen - 8
-	response2 := make([]byte, remainingMsgLen)
-	io.ReadFull(r, response2)
-	var resultObj = ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
+	resultObj, messageID := getResponse(conn)
 
-	if hdr.MessageID == 0x15 {
+	if messageID == 0x15 {
 		sessionBlocks := resultObj.(ipdrlib.GetSessionsResponseIdl).SessionBlocks
 		result := make([]uint8,len(sessionBlocks))
 		for i:=0; i<len(sessionBlocks);i++ {
@@ -138,18 +121,8 @@ func flowStart(conn net.Conn, sessionID uint8) bool {
 	conn.Write(result.Bytes())
 
 	//Load Header
-	response := make([]byte, 8)
-	var hdr ipdrlib.IPDRStreamingHeaderIdl
-
-	r := bufio.NewReader(conn)
-	io.ReadFull(r, response)
-	struc.Unpack(bytes.NewBuffer(response), &hdr)
-
-	var remainingMsgLen = hdr.MessageLen - 8
-	response2 := make([]byte, remainingMsgLen)
-	io.ReadFull(r, response2)
-	ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
-	if (hdr.MessageID == 0x10){
+	_, messageID := getResponse(conn)
+	if (messageID == 0x10){
 		return true
 	} else {
 		return false
@@ -169,35 +142,49 @@ func finalTemplateData(conn net.Conn, sessionID uint8) bool {
 	conn.Write(result.Bytes())
 
 	//Load Header
-	response := make([]byte, 8)
-	var hdr ipdrlib.IPDRStreamingHeaderIdl
-
-	r := bufio.NewReader(conn)
-	io.ReadFull(r, response)
-	struc.Unpack(bytes.NewBuffer(response), &hdr)
-
-	var remainingMsgLen = hdr.MessageLen - 8
-	response2 := make([]byte, remainingMsgLen)
-	io.ReadFull(r, response2)
-	var resultObj = ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
-	if (hdr.MessageID == 0x08){
+	resultObj, messageID := getResponse(conn)
+	fmt.Println(resultObj)
+	if (messageID == 0x08){
 		return true
 	} else {
 		return false
 	}
 }
+func keepAlive2() {
+	fmt.Println("Keep alive 2")
+}
+func keepAlive(conn net.Conn) {
+	fmt.Println("Keep Alive")
+	// var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
+	// 	Version:      2,
+	// 	MessageID:    0x40,
+	// 	SessionID:    0,
+	// 	MessageFlags: 0,
+	// 	MessageLen:   8,
+	// }
+	// result := ipdrlib.Hdr(hdrObj)
+	// conn.Write(result.Bytes())
+}
 func main() {
+	s, schedulerErr := scheduler.NewScheduler(1000)
+	if schedulerErr != nil  {
+		panic(schedulerErr)
+	}
 	var tcpAddr = "192.168.115.231:4737"
 	fmt.Println("ipdrgo ", currentVersion)
+	fmt.Println(runtime.NumCPU())
 	var conn, err = net.Dial("tcp", tcpAddr)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	if connect(conn) {
+		fmt.Println("Do Every second")
+		s.Every().Second(1).Do(keepAlive2)
 		sessions := getSessions(conn)
 		for i:=0;i<len(sessions);i++ {
 			if flowStart(conn,sessions[i]) {
+				time.Sleep(5 * time.Second)
 				finalTemplateData(conn, sessions[i])
 			}
 		}
