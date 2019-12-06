@@ -12,32 +12,57 @@ import (
 )
 
 const (
-	connectMsgType                  = 0x05
-	connectResponseMsgType          = 0x06
-	disconnectMsgType               = 0x07
-	flowStartMsgType                = 0x01
-	flowStopMsgType                 = 0x03
-	sessionStartMsgType             = 0x08
-	sessionStopMsgType              = 0x09
-	keepAliveMsgType                = 0x40
-	templateDataMsgType             = 0x10
-	modifyTemplateMsgType           = 0x1a
-	modifyTemplateResposeMsgType    = 0x1b
-	finalTemplateDataAckMsgType     = 0x13
-	startNegotiationMsgType         = 0x1d
+	// ConnectMsgType : Connection message Type ID
+	ConnectMsgType                  = 0x05
+	// ConnectResponseMsgType : Connection Response message Type ID
+	ConnectResponseMsgType          = 0x06
+	// DisconnectMsgType : disconnect message Type ID
+	DisconnectMsgType               = 0x07
+	// FlowStartMsgType : Connection message Type ID
+	FlowStartMsgType                = 0x01
+	// FlowStopMsgType : Connection message Type ID
+	FlowStopMsgType                 = 0x03
+	// SessionStartMsgType : Connection message Type ID
+	SessionStartMsgType             = 0x08
+	// SessionStopMsgType : Connection message Type ID
+	SessionStopMsgType              = 0x09
+	// KeepAliveMsgType : Connection message Type ID
+	KeepAliveMsgType                = 0x40
+	// TemplateDataMsgType : Connection message Type ID
+	TemplateDataMsgType             = 0x10
+	// ModifyTemplateMsgType : Connection message Type ID
+	ModifyTemplateMsgType           = 0x1a
+	// ModifyTemplateResponseMsgType : Connection message Type ID
+	ModifyTemplateResponseMsgType    = 0x1b
+	// FinalTemplateDataAckMsgType : Connection message Type ID
+	FinalTemplateDataAckMsgType     = 0x13
+	// StartNegotiationMsgType : Connection message Type ID
+	StartNegotiationMsgType         = 0x1d
+	// ConnectMsgType : Connection message Type ID
 	startNegotiationRejectMsgType   = 0x1e
-	getSessionsMsgType              = 0x14
-	getSessionsResponseMsgType      = 0x15
-	getTemplatesMsgType             = 0x16
-	getTemplatesResponseMsgType     = 0x17
-	dataMsgType                     = 0x20
+	// GetSessionsMsgType : Connection message Type ID
+	GetSessionsMsgType              = 0x14
+	// GetSessionsResponseMsgType : Connection message Type ID
+	GetSessionsResponseMsgType      = 0x15
+	// GetTemplatesMsgType : Connection message Type ID
+	GetTemplatesMsgType             = 0x16
+	// GetTemplatesResponseMsgType : Connection message Type ID
+	GetTemplatesResponseMsgType     = 0x17
+	// DataMsgType : Connection message Type ID
+	DataMsgType                     = 0x20
+	// DataAckMsgType : Connection message Type ID
 	dataAckMsgType                  = 0x21
-	requrestMsgType                 = 0x30
-	responseMsgType                 = 0x31
-	errorMsgType                    = 0x23
+	// RequestMsgType : Connection message Type ID
+	RequestMsgType                 = 0x30
+	// ResponseMsgType : Connection message Type ID
+	ResponseMsgType                 = 0x31
+	// ErrorMsgType : Connection message Type ID
+	ErrorMsgType                    = 0x23
+
 	structuresCapabilities          = 0x01
 	multisessionCapabilities        = 0x02
 	templateNegotiationCapabilities = 0x04
+
 )
 
 // IPDRStreamingHeaderIdl : The packet header.  you like?
@@ -116,16 +141,17 @@ type modifyTemplateResponseIdl struct {
 	ResultTemplates []templateBlockIdl
 }
 
-//type finalTemplateDataAckIdl {}
-//type startNegotiationReject {}
-type dataIdl struct {
+// DataIdl : This is the datastruct
+type DataIdl struct {
 	TemplateID  uint16
 	ConfigID    uint16
 	Flags       uint8
 	SequenceNum uint32
 	//opaque dataRecord<>
 }
-type dataAckIdl struct {
+
+// DataAckIdl : This is the Data Acknowledgement
+type DataAckIdl struct {
 	ConfigID    uint16
 	SequenceNum uint32
 }
@@ -289,7 +315,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			fmt.Println("We got data")
+
 			fmt.Println(sessionStartObj)
 		}
 	case 3:
