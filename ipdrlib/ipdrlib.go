@@ -13,56 +13,55 @@ import (
 
 const (
 	// ConnectMsgType : Connection message Type ID
-	ConnectMsgType                  = 0x05
+	ConnectMsgType = 0x05
 	// ConnectResponseMsgType : Connection Response message Type ID
-	ConnectResponseMsgType          = 0x06
+	ConnectResponseMsgType = 0x06
 	// DisconnectMsgType : disconnect message Type ID
-	DisconnectMsgType               = 0x07
+	DisconnectMsgType = 0x07
 	// FlowStartMsgType : Connection message Type ID
-	FlowStartMsgType                = 0x01
+	FlowStartMsgType = 0x01
 	// FlowStopMsgType : Connection message Type ID
-	FlowStopMsgType                 = 0x03
+	FlowStopMsgType = 0x03
 	// SessionStartMsgType : Connection message Type ID
-	SessionStartMsgType             = 0x08
+	SessionStartMsgType = 0x08
 	// SessionStopMsgType : Connection message Type ID
-	SessionStopMsgType              = 0x09
+	SessionStopMsgType = 0x09
 	// KeepAliveMsgType : Connection message Type ID
-	KeepAliveMsgType                = 0x40
+	KeepAliveMsgType = 0x40
 	// TemplateDataMsgType : Connection message Type ID
-	TemplateDataMsgType             = 0x10
+	TemplateDataMsgType = 0x10
 	// ModifyTemplateMsgType : Connection message Type ID
-	ModifyTemplateMsgType           = 0x1a
+	ModifyTemplateMsgType = 0x1a
 	// ModifyTemplateResponseMsgType : Connection message Type ID
-	ModifyTemplateResponseMsgType    = 0x1b
+	ModifyTemplateResponseMsgType = 0x1b
 	// FinalTemplateDataAckMsgType : Connection message Type ID
-	FinalTemplateDataAckMsgType     = 0x13
+	FinalTemplateDataAckMsgType = 0x13
 	// StartNegotiationMsgType : Connection message Type ID
-	StartNegotiationMsgType         = 0x1d
+	StartNegotiationMsgType = 0x1d
 	// ConnectMsgType : Connection message Type ID
-	startNegotiationRejectMsgType   = 0x1e
+	startNegotiationRejectMsgType = 0x1e
 	// GetSessionsMsgType : Connection message Type ID
-	GetSessionsMsgType              = 0x14
+	GetSessionsMsgType = 0x14
 	// GetSessionsResponseMsgType : Connection message Type ID
-	GetSessionsResponseMsgType      = 0x15
+	GetSessionsResponseMsgType = 0x15
 	// GetTemplatesMsgType : Connection message Type ID
-	GetTemplatesMsgType             = 0x16
+	GetTemplatesMsgType = 0x16
 	// GetTemplatesResponseMsgType : Connection message Type ID
-	GetTemplatesResponseMsgType     = 0x17
+	GetTemplatesResponseMsgType = 0x17
 	// DataMsgType : Connection message Type ID
-	DataMsgType                     = 0x20
+	DataMsgType = 0x20
 	// DataAckMsgType : Connection message Type ID
-	dataAckMsgType                  = 0x21
+	dataAckMsgType = 0x21
 	// RequestMsgType : Connection message Type ID
-	RequestMsgType                 = 0x30
+	RequestMsgType = 0x30
 	// ResponseMsgType : Connection message Type ID
-	ResponseMsgType                 = 0x31
+	ResponseMsgType = 0x31
 	// ErrorMsgType : Connection message Type ID
-	ErrorMsgType                    = 0x23
+	ErrorMsgType = 0x23
 
 	structuresCapabilities          = 0x01
 	multisessionCapabilities        = 0x02
 	templateNegotiationCapabilities = 0x04
-
 )
 
 // IPDRStreamingHeaderIdl : The packet header.  you like?
@@ -117,7 +116,9 @@ type sessionStopIdl struct {
 	ReasonInfoLen uint8 `struc:"uint32,sizeof=VendorID"`
 	ReasonInfo    string
 }
-type templateDataIdl struct {
+
+// TemplateDataIdl: template data IDL
+type TemplateDataIdl struct {
 	ConfigID           uint16
 	Flags              uint8
 	TemplateBlockCount uint32 `struc:"uint32,sizeof=ResultTemplates"`
@@ -146,14 +147,15 @@ type DataIdl struct {
 	TemplateID  uint16
 	ConfigID    uint16
 	Flags       uint8
-	SequenceNum uint32
+	SequenceNum uint64
+
 	//opaque dataRecord<>
 }
 
 // DataAckIdl : This is the Data Acknowledgement
 type DataAckIdl struct {
 	ConfigID    uint16
-	SequenceNum uint32
+	SequenceNum uint64
 }
 
 ////SOFAR
@@ -173,12 +175,11 @@ type responseIdl struct {
 	//opaque dataRecord<>
 
 }
+
 // GetSessionsIdl : This command is the GetSessions
 type GetSessionsIdl struct {
 	RequestID uint16
 }
-
-
 
 type GetSessionsResponseIdl struct {
 	RequestID         uint16
@@ -216,7 +217,7 @@ type fieldDescriptorIdl struct {
 }
 type sessionBlockIdl struct {
 	SessionID             uint8
-	Reserved              uint8
+	SessionType           uint8
 	SessionNameLen        uint32 `struc:"uint32,sizeof=SessionName"`
 	SessionName           string
 	SessionDescriptionLen uint32 `struc:"uint32,sizeof=SessionDescription"`
@@ -254,12 +255,13 @@ func Connect(hdr IPDRStreamingHeaderIdl, details ConnectIdl) bytes.Buffer {
 	return result
 
 }
+
 //GetSessions : Just GetSessions
-func GetSessions (hdr IPDRStreamingHeaderIdl, details GetSessionsIdl) bytes.Buffer {
+func GetSessions(hdr IPDRStreamingHeaderIdl, details GetSessionsIdl) bytes.Buffer {
 	var bufhdr bytes.Buffer
 	var bufdtls bytes.Buffer
 	var result bytes.Buffer
-	
+
 	struc.Pack(&bufhdr, &hdr)
 	struc.Pack(&bufdtls, &details)
 
@@ -267,8 +269,25 @@ func GetSessions (hdr IPDRStreamingHeaderIdl, details GetSessionsIdl) bytes.Buff
 	result.Write(bufdtls.Bytes())
 	return result
 }
+
+//DataAck : Just GetSessions
+func DataAck(hdr IPDRStreamingHeaderIdl, details DataAckIdl) bytes.Buffer {
+	var bufhdr bytes.Buffer
+	var bufdtls bytes.Buffer
+	var result bytes.Buffer
+
+	struc.Pack(&bufhdr, &hdr)
+	struc.Pack(&bufdtls, &details)
+	fmt.Println("------")
+	fmt.Println(details)
+
+	result.Write(bufhdr.Bytes())
+	result.Write(bufdtls.Bytes())
+	return result
+}
+
 //Hdr : Just Hdr
-func Hdr (hdr IPDRStreamingHeaderIdl) bytes.Buffer {
+func Hdr(hdr IPDRStreamingHeaderIdl) bytes.Buffer {
 	var bufhdr bytes.Buffer
 	struc.Pack(&bufhdr, &hdr)
 	return bufhdr
@@ -278,7 +297,7 @@ func Hdr (hdr IPDRStreamingHeaderIdl) bytes.Buffer {
 //ParseMessageByType : Parses message by message type
 func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32) interface{} {
 	switch messageID {
-	case 5:
+	case ConnectMsgType:
 		fmt.Println("CONNECT")
 
 		var connectObj ConnectIdl
@@ -288,7 +307,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		} else {
 			fmt.Println(connectObj)
 		}
-	case 6:
+	case ConnectResponseMsgType:
 		fmt.Println("CONNECT RESPONSE")
 		var connectResponseObj ConnectResponseIdl
 		err := struc.Unpack(packet, &connectResponseObj)
@@ -298,17 +317,17 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 			fmt.Println(connectResponseObj)
 		}
 		return connectResponseObj
-	case 7:
+	case DisconnectMsgType:
 		fmt.Println("Disconnect")
-	case 0x23:
+	case ErrorMsgType:
 		fmt.Println("Errors")
 		var errorObj ErrorResponseIdl
 		struc.Unpack(packet, &errorObj)
 		fmt.Println(errorObj)
 
-	case 1:
+	case FlowStartMsgType:
 		fmt.Println("Flow Start")
-	case 8:
+	case SessionStartMsgType:
 		fmt.Println("Session Start")
 		var sessionStartObj sessionStartIdl
 		err := struc.Unpack(packet, &sessionStartObj)
@@ -318,43 +337,52 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 
 			fmt.Println(sessionStartObj)
 		}
-	case 3:
+	case FlowStopMsgType:
 		fmt.Println("Flow Stop")
 
-	case 0x09:
+	case SessionStopMsgType:
 		fmt.Println("Session Stop")
 
-	case 0x10:
+	case TemplateDataMsgType:
 		fmt.Println("Template Data")
-		var templateDataObj templateDataIdl
+		var templateDataObj TemplateDataIdl
 		err := struc.Unpack(packet, &templateDataObj)
 		if err != nil {
 			fmt.Println(err)
 		} else {
 			fmt.Println(templateDataObj)
 		}
-	case 0x1a:
+		return templateDataObj
+	case ModifyTemplateMsgType:
 		fmt.Println("Modify Template") //Ignore
-	case 0x1b:
+	case ModifyTemplateResponseMsgType:
 		fmt.Println("Modify Template Response") //ignore
-	case 0x13:
+	case FinalTemplateDataAckMsgType:
 		fmt.Println("Final Template DATA Ack") //ignore
-	case 0x1d:
+	case StartNegotiationMsgType:
 		fmt.Println("START Negotiation") //Ignore
-	case 0x1e:
+	case startNegotiationRejectMsgType:
 		fmt.Println("START Negotiation Reject") //Ignore
-	case 0x20:
+	case DataMsgType:
 		fmt.Println("DATA")
+		var dataObj DataIdl
+		err := struc.Unpack(packet, &dataObj)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println(dataObj)
+		}
+		return dataObj
 		//var data dataIdl
 
 		//data.DataRecord, err = packet.ReadString(0)
-	case 0x21:
+	case dataAckMsgType:
 		fmt.Println("Data Acknowledge")
-	case 0x30:
+	case RequestMsgType:
 		fmt.Println("REQUEST")
-	case 0x31:
+	case ResponseMsgType:
 		fmt.Println("RESPONSE")
-	case 0x14:
+	case GetSessionsMsgType:
 		fmt.Println("GET Sessions")
 		var dataObj GetSessionsIdl
 
@@ -365,7 +393,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 			fmt.Println(dataObj)
 		}
 		fmt.Println(dataObj)
-	case 0x15:
+	case GetSessionsResponseMsgType:
 
 		fmt.Println("Get Sessions Response")
 		var dataObj GetSessionsResponseIdl
@@ -379,11 +407,11 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		fmt.Println(dataObj)
 		return dataObj
 
-	case 0x16:
+	case GetTemplatesMsgType:
 		fmt.Println("Get Templates")
-	case 0x17:
+	case GetTemplatesResponseMsgType:
 		fmt.Println("Get Templates Response")
-	case 0x40:
+	case KeepAliveMsgType:
 		//fmt.Println("Keep Alive")
 	}
 	return nil
