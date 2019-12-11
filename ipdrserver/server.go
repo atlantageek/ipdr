@@ -18,17 +18,24 @@ import (
 	//"time"
 )
 
+type responseResult struct {
+	Result    interface{}
+	MessageID uint8
+}
+
 var sessionID uint8 = 0
 var configID uint16 = 0
 
 const currentVersion = "0.01"
 
+var r io.Reader = nil
+
 func getResponse(conn net.Conn) (interface{}, uint8) {
+	fmt.Println("-----------------------------------------")
 	response := make([]byte, 8)
 	var messageID uint8 = 0x40
 	var hdr ipdrlib.IPDRStreamingHeaderIdl
 
-	r := bufio.NewReader(conn)
 	for messageID == 0x40 {
 		var nbr, err = io.ReadFull(r, response)
 		if err != nil {
@@ -38,6 +45,7 @@ func getResponse(conn net.Conn) (interface{}, uint8) {
 			panic("Not enough bytes read")
 		}
 		struc.Unpack(bytes.NewBuffer(response), &hdr)
+		fmt.Println(response)
 		messageID = hdr.MessageID
 		if messageID == 0x40 {
 			fmt.Println("Keep Alive")
@@ -45,11 +53,28 @@ func getResponse(conn net.Conn) (interface{}, uint8) {
 		}
 	}
 	var remainingMsgLen = hdr.MessageLen - 8
-
+	fmt.Println("Remaining message len:", remainingMsgLen)
 	response2 := make([]byte, remainingMsgLen)
 	io.ReadFull(r, response2)
+	fmt.Println("Response2:", response2)
 	var result = ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
+
 	return result, hdr.MessageID
+}
+
+func getMultipleResponses(conn net.Conn) []responseResult {
+	results := make([]responseResult, 0)
+	var moreBytes bool = true
+	for moreBytes == true {
+		result, messageID := getResponse(conn)
+		r := responseResult{result, messageID}
+		results = append(results, r)
+		_, err := bufio.NewReader(conn).Peek(1)
+		if err == bufio.ErrBufferFull {
+			moreBytes = false
+		}
+	}
+	return results
 }
 func connect(conn net.Conn) bool {
 	fmt.Println("Sending Connect")
@@ -202,9 +227,14 @@ func checkDataAvailable(conn net.Conn) {
 	} else if msgType == ipdrlib.SessionStopMsgType {
 		keepAlive(conn)
 	} else if msgType == ipdrlib.DataMsgType {
-		data := dataObj.(ipdrlib.DataIdl)
-		dataAck(conn, data.SequenceNum)
-		fmt.Println("Data Is here :", data)
+		//data := dataObj.(ipdrlib.DataIdl)
+		// _, err := bufio.NewReader(conn).Peek(1)
+		// if err == bufio.ErrBufferFull {
+		// 	dataAck(conn, data.SequenceNum)
+		// 	fmt.Println("Data Is here with ACK! :", data)
+		// } else {
+		// 	fmt.Println("Data Is here :", data)
+		// }
 
 	} else {
 		fmt.Println("Did Not Handle:", msgType)
@@ -226,6 +256,7 @@ func main() {
 	}
 	connect(conn)
 	fmt.Println("Running checkDataAvailable")
+	r = bufio.NewReader(conn)
 	for {
 		checkDataAvailable(conn)
 	}
