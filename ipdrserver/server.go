@@ -25,12 +25,13 @@ type responseResult struct {
 
 var sessionID uint8 = 0
 var configID uint16 = 0
+var deadline time.Time = time.Now()
 
 const currentVersion = "0.01"
 
 var r io.Reader = nil
 
-func getResponse(conn net.Conn) (interface{}, uint8) {
+func getResponse(conn net.Conn) (interface{}, uint8,uint32) {
 	fmt.Println("-----------------------------------------")
 	response := make([]byte, 8)
 	var messageID uint8 = 0x40
@@ -38,10 +39,12 @@ func getResponse(conn net.Conn) (interface{}, uint8) {
 
 	for messageID == 0x40 {
 		var nbr, err = io.ReadFull(r, response)
-		if err != nil {
-			panic(fmt.Sprintf("Error:%d\n", err))
-		}
-		if nbr < 8 {
+		if nbr ==0 && err== io.EOF {
+			return nil, uint8(99),8
+		} else if err != nil {
+			
+			panic(fmt.Sprintf("xxError:%d\n", err))
+		} else if nbr < 8 {
 			panic("Not enough bytes read")
 		}
 		struc.Unpack(bytes.NewBuffer(response), &hdr)
@@ -59,14 +62,14 @@ func getResponse(conn net.Conn) (interface{}, uint8) {
 	fmt.Println("Response2:", response2)
 	var result = ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
 
-	return result, hdr.MessageID
+	return result, hdr.MessageID, hdr.MessageLen
 }
 
 func getMultipleResponses(conn net.Conn) []responseResult {
 	results := make([]responseResult, 0)
 	var moreBytes bool = true
 	for moreBytes == true {
-		result, messageID := getResponse(conn)
+		result, messageID,_ := getResponse(conn)
 		r := responseResult{result, messageID}
 		results = append(results, r)
 		_, err := bufio.NewReader(conn).Peek(1)
@@ -187,7 +190,7 @@ func dataAck(conn net.Conn, sequenceNum uint64) {
 		MessageID:    0x21,
 		SessionID:    sessionID,
 		MessageFlags: 0,
-		MessageLen:   8,
+		MessageLen:   18,
 	}
 	var dataAckObj = ipdrlib.DataAckIdl{
 		ConfigID:    configID,
@@ -200,9 +203,10 @@ func dataAck(conn net.Conn, sequenceNum uint64) {
 	conn.Write(result.Bytes())
 }
 func checkDataAvailable(conn net.Conn) {
-	dataObj, msgType := getResponse(conn)
+	dataObj, msgType, msgLen := getResponse(conn)
+	
 	currentTime := time.Now()
-	fmt.Println("Response Message Type:", msgType, currentTime.String())
+	fmt.Println("Response Message Type:", msgType, msgLen,currentTime.String())
 	if msgType == ipdrlib.ConnectResponseMsgType {
 		getSessions(conn)
 
@@ -227,6 +231,15 @@ func checkDataAvailable(conn net.Conn) {
 	} else if msgType == ipdrlib.SessionStopMsgType {
 		keepAlive(conn)
 	} else if msgType == ipdrlib.DataMsgType {
+		data := dataObj.(ipdrlib.FullDataIdl)
+		fmt.Println(data.Data)
+		//if deadline.Before(time.Now()) {
+			seq := data.SequenceNum
+			
+			dataAck(conn, seq)
+		//	deadline = time.Now().Add(time.Second * 3)
+		//	fmt.Println("Update:",time.Now(), deadline)
+		//}
 		//data := dataObj.(ipdrlib.DataIdl)
 		// _, err := bufio.NewReader(conn).Peek(1)
 		// if err == bufio.ErrBufferFull {

@@ -151,6 +151,14 @@ type DataIdl struct {
 
 	//opaque dataRecord<>
 }
+// FullDataIdl : This is the datastruct
+type FullDataIdl struct {
+	TemplateID  uint16
+	ConfigID    uint16
+	Flags       uint8
+	SequenceNum uint64
+	Data []byte
+}
 
 // DataAckIdl : This is the Data Acknowledgement
 type DataAckIdl struct {
@@ -366,13 +374,21 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 	case DataMsgType:
 		fmt.Println("DATA")
 		var dataObj DataIdl
+		var resultDataObj FullDataIdl
 		err := struc.Unpack(packet, &dataObj)
 		if err != nil {
 			fmt.Println(err)
 		} else {
 			fmt.Println(dataObj)
 		}
-		return dataObj
+		resultDataObj.TemplateID = dataObj.TemplateID
+		resultDataObj.ConfigID = dataObj.ConfigID
+		resultDataObj.Flags = dataObj.Flags
+		resultDataObj.SequenceNum = dataObj.SequenceNum
+		n := messageLen - 21
+		resultDataObj.Data = packet.Bytes()[21:n]
+
+		return resultDataObj
 		//var data dataIdl
 
 		//data.DataRecord, err = packet.ReadString(0)
