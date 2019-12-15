@@ -7,9 +7,11 @@ import (
 	"io"
 	"ipdrlib"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+	
 
 	//"github.com/prprprus/scheduler"
 	"runtime"
@@ -17,21 +19,28 @@ import (
 	"github.com/lunixbochs/struc"
 	//"time"
 )
+type sessionTrack struct {
+	xdrf *os.File
+	sessionID uint8 
+	configID uint16 
+	seq uint64
+}
 
 type responseResult struct {
 	Result    interface{}
 	MessageID uint8
 }
-
+var xdrf *os.File
 var sessionID uint8 = 0
 var configID uint16 = 0
 var deadline time.Time = time.Now()
+var seq uint64 = 0
 
 const currentVersion = "0.01"
 
 var r io.Reader = nil
 
-func getResponse(conn net.Conn) (interface{}, uint8,uint32) {
+func getResponse(conn net.Conn) (interface{}, uint8, uint32) {
 	fmt.Println("-----------------------------------------")
 	response := make([]byte, 8)
 	var messageID uint8 = 0x40
@@ -39,10 +48,10 @@ func getResponse(conn net.Conn) (interface{}, uint8,uint32) {
 
 	for messageID == 0x40 {
 		var nbr, err = io.ReadFull(r, response)
-		if nbr ==0 && err== io.EOF {
-			return nil, uint8(99),8
+		if nbr == 0 && err == io.EOF {
+			return nil, uint8(99), 8
 		} else if err != nil {
-			
+
 			panic(fmt.Sprintf("xxError:%d\n", err))
 		} else if nbr < 8 {
 			panic("Not enough bytes read")
@@ -69,7 +78,7 @@ func getMultipleResponses(conn net.Conn) []responseResult {
 	results := make([]responseResult, 0)
 	var moreBytes bool = true
 	for moreBytes == true {
-		result, messageID,_ := getResponse(conn)
+		result, messageID, _ := getResponse(conn)
 		r := responseResult{result, messageID}
 		results = append(results, r)
 		_, err := bufio.NewReader(conn).Peek(1)
@@ -204,9 +213,9 @@ func dataAck(conn net.Conn, sequenceNum uint64) {
 }
 func checkDataAvailable(conn net.Conn) {
 	dataObj, msgType, msgLen := getResponse(conn)
-	
+
 	currentTime := time.Now()
-	fmt.Println("Response Message Type:", msgType, msgLen,currentTime.String())
+	fmt.Println("Response Message Type:", msgType, msgLen, currentTime.String())
 	if msgType == ipdrlib.ConnectResponseMsgType {
 		getSessions(conn)
 
@@ -225,18 +234,35 @@ func checkDataAvailable(conn net.Conn) {
 		fmt.Println("Config id:", configID)
 		finalTemplateData(conn, sessionID)
 	} else if msgType == ipdrlib.SessionStartMsgType {
+		data := dataObj.(ipdrlib.SessionStartIdl)
+		fname := fmt.Sprintf("/tmp/doc-%x.xdr", data.DocumentID)
+		
+		var err error
+		xdrf, err = os.Create(fname)
+		if err!= nil {
+			fmt.Println(err)
+		}
 		keepAlive(conn)
+	} else if msgType == ipdrlib.SessionStopMsgType {
+		keepAlive(conn)
+		xdrf.Sync()
+		
+		seq = 0
 	} else if msgType == ipdrlib.KeepAliveMsgType {
 		keepAlive(conn)
 	} else if msgType == ipdrlib.SessionStopMsgType {
 		keepAlive(conn)
 	} else if msgType == ipdrlib.DataMsgType {
 		data := dataObj.(ipdrlib.FullDataIdl)
+		fmt.Println("*************************************************")
 		fmt.Println(data.Data)
 		//if deadline.Before(time.Now()) {
-			seq := data.SequenceNum
-			
+		if seq == data.SequenceNum {
 			dataAck(conn, seq)
+			xdrf.Write(data.Data)
+		}
+		seq++
+
 		//	deadline = time.Now().Add(time.Second * 3)
 		//	fmt.Println("Update:",time.Now(), deadline)
 		//}

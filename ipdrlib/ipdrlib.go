@@ -97,7 +97,7 @@ type ErrorResponseIdl struct {
 	DescriptionLen uint32 `struc:"uint32,sizeof=Description"`
 	Description    string
 }
-type sessionStartIdl struct {
+type SessionStartIdl struct {
 	ExporterBootTime          int32
 	FirstRecordSequenceNumber int64
 	DroppedRecordCount        int64
@@ -337,7 +337,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		fmt.Println("Flow Start")
 	case SessionStartMsgType:
 		fmt.Println("Session Start")
-		var sessionStartObj sessionStartIdl
+		var sessionStartObj SessionStartIdl
 		err := struc.Unpack(packet, &sessionStartObj)
 		if err != nil {
 			fmt.Println(err)
@@ -345,6 +345,8 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 
 			fmt.Println(sessionStartObj)
 		}
+		return sessionStartObj
+		
 	case FlowStopMsgType:
 		fmt.Println("Flow Stop")
 
