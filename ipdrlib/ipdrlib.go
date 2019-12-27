@@ -64,6 +64,8 @@ const (
 	templateNegotiationCapabilities = 0x04
 )
 
+   
+
 // IPDRStreamingHeaderIdl : The packet header.  you like?
 type IPDRStreamingHeaderIdl struct {
 	Version      uint8
@@ -332,7 +334,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		var errorObj ErrorResponseIdl
 		struc.Unpack(packet, &errorObj)
 		fmt.Println(errorObj)
-
+		return errorObj
 	case FlowStartMsgType:
 		fmt.Println("Flow Start")
 	case SessionStartMsgType:
@@ -431,6 +433,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		fmt.Println("Get Templates Response")
 	case KeepAliveMsgType:
 		//fmt.Println("Keep Alive")
+
 	}
 	return nil
 }

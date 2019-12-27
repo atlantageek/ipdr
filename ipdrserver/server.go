@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	
 
 	//"github.com/prprprus/scheduler"
 	"runtime"
@@ -19,28 +18,29 @@ import (
 	"github.com/lunixbochs/struc"
 	//"time"
 )
+
 type sessionTrack struct {
-	xdrf *os.File
-	sessionID uint8 
-	configID uint16 
-	seq uint64
+	xdrf      *os.File
+	sessionID uint8
+	configID  uint16
+	seq       uint64
 }
 
 type responseResult struct {
 	Result    interface{}
 	MessageID uint8
 }
+
 var xdrf *os.File
-var sessionID uint8 = 0
 var configID uint16 = 0
-var deadline time.Time = time.Now()
-var seq uint64 = 0
+
+var sessionList []sessionTrack
 
 const currentVersion = "0.01"
 
 var r io.Reader = nil
 
-func getResponse(conn net.Conn) (interface{}, uint8, uint32) {
+func getResponse(conn net.Conn) (interface{}, ipdrlib.IPDRStreamingHeaderIdl) {
 	fmt.Println("-----------------------------------------")
 	response := make([]byte, 8)
 	var messageID uint8 = 0x40
@@ -49,7 +49,7 @@ func getResponse(conn net.Conn) (interface{}, uint8, uint32) {
 	for messageID == 0x40 {
 		var nbr, err = io.ReadFull(r, response)
 		if nbr == 0 && err == io.EOF {
-			return nil, uint8(99), 8
+			return nil, hdr
 		} else if err != nil {
 
 			panic(fmt.Sprintf("xxError:%d\n", err))
@@ -71,15 +71,15 @@ func getResponse(conn net.Conn) (interface{}, uint8, uint32) {
 	fmt.Println("Response2:", response2)
 	var result = ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
 
-	return result, hdr.MessageID, hdr.MessageLen
+	return result, hdr
 }
 
 func getMultipleResponses(conn net.Conn) []responseResult {
 	results := make([]responseResult, 0)
 	var moreBytes bool = true
 	for moreBytes == true {
-		result, messageID, _ := getResponse(conn)
-		r := responseResult{result, messageID}
+		result, hdr := getResponse(conn)
+		r := responseResult{result, hdr.MessageID}
 		results = append(results, r)
 		_, err := bufio.NewReader(conn).Peek(1)
 		if err == bufio.ErrBufferFull {
@@ -192,7 +192,7 @@ func keepAlive(conn net.Conn) {
 	result := ipdrlib.Hdr(hdrObj)
 	conn.Write(result.Bytes())
 }
-func dataAck(conn net.Conn, sequenceNum uint64) {
+func dataAck(conn net.Conn, sequenceNum uint64, sessionID uint8) {
 	fmt.Println("Sending data Ack")
 	var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
 		Version:      2,
@@ -212,56 +212,66 @@ func dataAck(conn net.Conn, sequenceNum uint64) {
 	conn.Write(result.Bytes())
 }
 func checkDataAvailable(conn net.Conn) {
-	dataObj, msgType, msgLen := getResponse(conn)
+	dataObj, msgHdr := getResponse(conn)
 
 	currentTime := time.Now()
-	fmt.Println("Response Message Type:", msgType, msgLen, currentTime.String())
-	if msgType == ipdrlib.ConnectResponseMsgType {
+	fmt.Println("Response Message Type:", msgHdr.MessageID, msgHdr.MessageLen, currentTime.String())
+	if msgHdr.MessageID == ipdrlib.ConnectResponseMsgType {
 		getSessions(conn)
 
-	} else if msgType == ipdrlib.GetSessionsResponseMsgType {
+	} else if msgHdr.MessageID == ipdrlib.GetSessionsResponseMsgType {
 		sessions := dataObj.(ipdrlib.GetSessionsResponseIdl)
-		sessionID = sessions.SessionBlocks[1].SessionID
+		//sessionID = sessions.SessionBlocks[1].SessionID
 		fmt.Println("SESSIONS AVAIL")
 		for i := 0; i < len(sessions.SessionBlocks); i++ {
+
 			sess := sessions.SessionBlocks[i]
-			fmt.Println("Session ID", sess.SessionType, sess.SessionName, sess.SessionID)
+			if sess.SessionType == 1 || sess.SessionType == 4 {
+				sessionList = append(sessionList,
+					sessionTrack{
+						sessionID: sess.SessionID,
+						seq:       0,
+					})
+			}
+			fmt.Println("Session: ", sess.SessionType, sess.SessionName, sess.SessionID)
 		}
-		flowStart(conn, sessionID)
-	} else if msgType == ipdrlib.TemplateDataMsgType {
+		//Start flow on the first session in the session List
+		fmt.Println(sessionList)
+		flowStart(conn, sessionList[0].sessionID)
+	} else if msgHdr.MessageID == ipdrlib.TemplateDataMsgType {
 		data := dataObj.(ipdrlib.TemplateDataIdl)
 		configID = data.ConfigID
 		fmt.Println("Config id:", configID)
-		finalTemplateData(conn, sessionID)
-	} else if msgType == ipdrlib.SessionStartMsgType {
+		finalTemplateData(conn, msgHdr.SessionID)
+	} else if msgHdr.MessageID == ipdrlib.SessionStartMsgType {
 		data := dataObj.(ipdrlib.SessionStartIdl)
 		fname := fmt.Sprintf("/tmp/doc-%x.xdr", data.DocumentID)
-		
+
 		var err error
 		xdrf, err = os.Create(fname)
-		if err!= nil {
+		if err != nil {
 			fmt.Println(err)
 		}
 		keepAlive(conn)
-	} else if msgType == ipdrlib.SessionStopMsgType {
+	} else if msgHdr.MessageID == ipdrlib.SessionStopMsgType {
 		keepAlive(conn)
 		xdrf.Sync()
-		
-		seq = 0
-	} else if msgType == ipdrlib.KeepAliveMsgType {
+
+		sessionList[0].seq = 0
+	} else if msgHdr.MessageID == ipdrlib.KeepAliveMsgType {
 		keepAlive(conn)
-	} else if msgType == ipdrlib.SessionStopMsgType {
+	} else if msgHdr.MessageID == ipdrlib.SessionStopMsgType {
 		keepAlive(conn)
-	} else if msgType == ipdrlib.DataMsgType {
+	} else if msgHdr.MessageID == ipdrlib.DataMsgType {
 		data := dataObj.(ipdrlib.FullDataIdl)
 		fmt.Println("*************************************************")
 		fmt.Println(data.Data)
 		//if deadline.Before(time.Now()) {
-		if seq == data.SequenceNum {
-			dataAck(conn, seq)
+		if sessionList[0].seq == data.SequenceNum {
+			dataAck(conn, sessionList[0].seq, msgHdr.SessionID)
 			xdrf.Write(data.Data)
 		}
-		seq++
+		sessionList[0].seq++
 
 		//	deadline = time.Now().Add(time.Second * 3)
 		//	fmt.Println("Update:",time.Now(), deadline)
@@ -275,8 +285,12 @@ func checkDataAvailable(conn net.Conn) {
 		// 	fmt.Println("Data Is here :", data)
 		// }
 
+	} else if msgHdr.MessageID == ipdrlib.ErrorMsgType {
+		data := dataObj.(ipdrlib.ErrorResponseIdl)
+		fmt.Println("*************************************************")
+		fmt.Println(data.Description)
 	} else {
-		fmt.Println("Did Not Handle:", msgType)
+		fmt.Println("Did Not Handle:", msgHdr.MessageID)
 	}
 
 }
