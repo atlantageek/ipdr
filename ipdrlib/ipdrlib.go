@@ -119,17 +119,29 @@ type sessionStopIdl struct {
 	ReasonInfo    string
 }
 
-// TemplateDataIdl: template data IDL
+// TemplateDataIdl : template data IDL
 type TemplateDataIdl struct {
 	ConfigID           uint16
 	Flags              uint8
 	TemplateBlockCount uint32 `struc:"uint32,sizeof=ResultTemplates"`
 	ResultTemplates    []templateBlockIdl
 }
+// FieldDescriptorIdl : template data IDL
+type FieldDescriptorIdl struct {
+	TypeID    uint32
+	FieldID   uint32
+	FieldNameLen uint32 `struc:"uint32,sizeof=FieldName"`
+	FieldName string
+	IsEnabled uint8
+}
 type templateBlockIdl struct {
 	TemplateID   int16
-	SchmaNameLen int32 `struc:"uint32,sizeof=SchemaName"`
+	SchemaNameLen int32 `struc:"uint32,sizeof=SchemaName"`
 	SchemaName   string
+	TypeNameLen int32 `struc:"uint32,sizeof=TypeName"`
+	TypeName   string
+	FieldDescriptorCount uint32 `struc:"uint32,sizeof=FieldDescriptors"`
+	FieldDescriptors []FieldDescriptorIdl
 }
 type typeDefinitionIdl struct {
 }
@@ -219,12 +231,7 @@ type getTemplateResponseWithUDTsIdl struct {
 	CurrentTemplates     []templateBlockIdl
 }
 
-type fieldDescriptorIdl struct {
-	TypeID    uint32
-	FieldID   uint32
-	FieldName string
-	IsEnabled uint8
-}
+
 type sessionBlockIdl struct {
 	SessionID             uint8
 	SessionType           uint8
@@ -389,8 +396,8 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		resultDataObj.ConfigID = dataObj.ConfigID
 		resultDataObj.Flags = dataObj.Flags
 		resultDataObj.SequenceNum = dataObj.SequenceNum
-		n := messageLen - 21
-		resultDataObj.Data = packet.Bytes()[21:n]
+		//n := messageLen - 21
+		resultDataObj.Data = packet.Bytes()//[21:n]
 
 		return resultDataObj
 		//var data dataIdl

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"xdrlib"
 
 	//"github.com/prprprus/scheduler"
 	"runtime"
@@ -20,10 +21,11 @@ import (
 )
 
 type sessionTrack struct {
-	xdrf      *os.File
-	sessionID uint8
-	configID  uint16
-	seq       uint64
+	xdrf        *os.File
+	sessionID   uint8
+	configID    uint16
+	seq         uint64
+	sessionName string
 }
 
 type responseResult struct {
@@ -34,11 +36,12 @@ type responseResult struct {
 var xdrf *os.File
 var configID uint16 = 0
 
-var sessionList []sessionTrack
+var sessionMap = make(map[uint8]sessionTrack)
 
 const currentVersion = "0.01"
 
 var r io.Reader = nil
+var templateMap = make(map[uint8][]ipdrlib.FieldDescriptorIdl)
 
 func getResponse(conn net.Conn) (interface{}, ipdrlib.IPDRStreamingHeaderIdl) {
 	fmt.Println("-----------------------------------------")
@@ -220,32 +223,40 @@ func checkDataAvailable(conn net.Conn) {
 		getSessions(conn)
 
 	} else if msgHdr.MessageID == ipdrlib.GetSessionsResponseMsgType {
+		var firstSession uint8 = 255
 		sessions := dataObj.(ipdrlib.GetSessionsResponseIdl)
 		//sessionID = sessions.SessionBlocks[1].SessionID
 		fmt.Println("SESSIONS AVAIL")
 		for i := 0; i < len(sessions.SessionBlocks); i++ {
 
 			sess := sessions.SessionBlocks[i]
+			if firstSession == 255 {
+				firstSession = sess.SessionID
+			}
 			if sess.SessionType == 1 || sess.SessionType == 4 {
-				sessionList = append(sessionList,
+				sessionMap[sess.SessionID] =
 					sessionTrack{
-						sessionID: sess.SessionID,
-						seq:       0,
-					})
+						sessionID:   sess.SessionID,
+						seq:         0,
+						sessionName: sess.SessionName,
+					}
 			}
 			fmt.Println("Session: ", sess.SessionType, sess.SessionName, sess.SessionID)
 		}
 		//Start flow on the first session in the session List
-		fmt.Println(sessionList)
-		flowStart(conn, sessionList[0].sessionID)
+		fmt.Println(sessionMap)
+		flowStart(conn, sessionMap[firstSession].sessionID)
 	} else if msgHdr.MessageID == ipdrlib.TemplateDataMsgType {
 		data := dataObj.(ipdrlib.TemplateDataIdl)
 		configID = data.ConfigID
+		fmt.Println(dataObj)
 		fmt.Println("Config id:", configID)
+		templateMap[msgHdr.SessionID] = data.ResultTemplates[0].FieldDescriptors
+		fmt.Println(data.ResultTemplates[0].FieldDescriptors)
 		finalTemplateData(conn, msgHdr.SessionID)
 	} else if msgHdr.MessageID == ipdrlib.SessionStartMsgType {
 		data := dataObj.(ipdrlib.SessionStartIdl)
-		fname := fmt.Sprintf("/tmp/doc-%x.xdr", data.DocumentID)
+		fname := fmt.Sprintf("/tmp/doc_%s_%x.xdr", sessionMap[msgHdr.SessionID].sessionName, data.DocumentID)
 
 		var err error
 		xdrf, err = os.Create(fname)
@@ -256,8 +267,9 @@ func checkDataAvailable(conn net.Conn) {
 	} else if msgHdr.MessageID == ipdrlib.SessionStopMsgType {
 		keepAlive(conn)
 		xdrf.Sync()
-
-		sessionList[0].seq = 0
+		tempSession := sessionMap[msgHdr.SessionID]
+		tempSession.seq = 0
+		sessionMap[msgHdr.SessionID] = tempSession
 	} else if msgHdr.MessageID == ipdrlib.KeepAliveMsgType {
 		keepAlive(conn)
 	} else if msgHdr.MessageID == ipdrlib.SessionStopMsgType {
@@ -267,11 +279,15 @@ func checkDataAvailable(conn net.Conn) {
 		fmt.Println("*************************************************")
 		fmt.Println(data.Data)
 		//if deadline.Before(time.Now()) {
-		if sessionList[0].seq == data.SequenceNum {
-			dataAck(conn, sessionList[0].seq, msgHdr.SessionID)
+		if sessionMap[msgHdr.SessionID].seq == data.SequenceNum {
+			dataAck(conn, sessionMap[msgHdr.SessionID].seq, msgHdr.SessionID)
 			xdrf.Write(data.Data)
+			xdrlib.ParseData(templateMap[msgHdr.SessionID], data.Data)
 		}
-		sessionList[0].seq++
+
+		tempSession := sessionMap[msgHdr.SessionID]
+		tempSession.seq++
+		sessionMap[msgHdr.SessionID] = tempSession
 
 		//	deadline = time.Now().Add(time.Second * 3)
 		//	fmt.Println("Update:",time.Now(), deadline)
