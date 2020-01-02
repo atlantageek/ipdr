@@ -64,8 +64,6 @@ const (
 	templateNegotiationCapabilities = 0x04
 )
 
-   
-
 // IPDRStreamingHeaderIdl : The packet header.  you like?
 type IPDRStreamingHeaderIdl struct {
 	Version      uint8
@@ -126,22 +124,23 @@ type TemplateDataIdl struct {
 	TemplateBlockCount uint32 `struc:"uint32,sizeof=ResultTemplates"`
 	ResultTemplates    []templateBlockIdl
 }
+
 // FieldDescriptorIdl : template data IDL
 type FieldDescriptorIdl struct {
-	TypeID    uint32
-	FieldID   uint32
+	TypeID       uint32
+	FieldID      uint32
 	FieldNameLen uint32 `struc:"uint32,sizeof=FieldName"`
-	FieldName string
-	IsEnabled uint8
+	FieldName    string
+	IsEnabled    uint8
 }
 type templateBlockIdl struct {
-	TemplateID   int16
-	SchemaNameLen int32 `struc:"uint32,sizeof=SchemaName"`
-	SchemaName   string
-	TypeNameLen int32 `struc:"uint32,sizeof=TypeName"`
-	TypeName   string
+	TemplateID           int16
+	SchemaNameLen        int32 `struc:"uint32,sizeof=SchemaName"`
+	SchemaName           string
+	TypeNameLen          int32 `struc:"uint32,sizeof=TypeName"`
+	TypeName             string
 	FieldDescriptorCount uint32 `struc:"uint32,sizeof=FieldDescriptors"`
-	FieldDescriptors []FieldDescriptorIdl
+	FieldDescriptors     []FieldDescriptorIdl
 }
 type typeDefinitionIdl struct {
 }
@@ -165,13 +164,14 @@ type DataIdl struct {
 
 	//opaque dataRecord<>
 }
+
 // FullDataIdl : This is the datastruct
 type FullDataIdl struct {
 	TemplateID  uint16
 	ConfigID    uint16
 	Flags       uint8
 	SequenceNum uint64
-	Data []byte
+	Data        []byte
 }
 
 // DataAckIdl : This is the Data Acknowledgement
@@ -230,7 +230,6 @@ type getTemplateResponseWithUDTsIdl struct {
 	TemplateBlockCount   uint32 `struc:"uint32, sizeof=CurrentTemplates"`
 	CurrentTemplates     []templateBlockIdl
 }
-
 
 type sessionBlockIdl struct {
 	SessionID             uint8
@@ -327,6 +326,9 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 	case ConnectResponseMsgType:
 		fmt.Println("CONNECT RESPONSE")
 		var connectResponseObj ConnectResponseIdl
+		if connectResponseObj.Capabilites| multisessionCapabilities == multisessionCapabilities {
+			fmt.Println("Connect Response Capabilities is MultiSession!")
+		}
 		err := struc.Unpack(packet, &connectResponseObj)
 		if err != nil {
 			fmt.Println(err)
@@ -355,7 +357,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 			fmt.Println(sessionStartObj)
 		}
 		return sessionStartObj
-		
+
 	case FlowStopMsgType:
 		fmt.Println("Flow Stop")
 
@@ -397,7 +399,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		resultDataObj.Flags = dataObj.Flags
 		resultDataObj.SequenceNum = dataObj.SequenceNum
 		//n := messageLen - 21
-		resultDataObj.Data = packet.Bytes()//[21:n]
+		resultDataObj.Data = packet.Bytes() //[21:n]
 
 		return resultDataObj
 		//var data dataIdl
@@ -445,33 +447,4 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 	return nil
 }
 
-// func main() {
-// 	// Open file instead of device
-// 	handle, err = pcap.OpenOffline(pcapFile)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	defer handle.Close()
 
-// 	// Loop through packets in file
-// 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-
-// 	for packet := range packetSource.Packets() {
-// 		if packet != nil && packet.ApplicationLayer() != nil && packet.ApplicationLayer().Payload() != nil {
-// 			buffer := packet.ApplicationLayer().Payload()
-// 			//buffer := []byte{0x18, 0x2d, 0x44, 0x54, 0xfb, 0x21, 0x09, 0x40}
-// 			partialPacket := bytes.NewBuffer(buffer)
-// 			if partialPacket.Len() >= 8 {
-// 				var headerObj iPDRStreamingHeaderIdl
-// 				err := struc.Unpack(partialPacket, &headerObj)
-// 				if err != nil {
-// 					fmt.Println(err)
-// 				}
-// 				fmt.Println(headerObj)
-// 				parseMessage(partialPacket, headerObj.MessageID, headerObj.MessageLen)
-// 				//fmt.Println(header)
-
-// 			}
-// 		}
-// 	}
-// }

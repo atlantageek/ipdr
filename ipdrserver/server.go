@@ -17,7 +17,9 @@ import (
 	"runtime"
 
 	"github.com/lunixbochs/struc"
+
 	//"time"
+	"net/http"
 )
 
 type sessionTrack struct {
@@ -71,7 +73,7 @@ func getResponse(conn net.Conn) (interface{}, ipdrlib.IPDRStreamingHeaderIdl) {
 	fmt.Println("Remaining message len:", remainingMsgLen)
 	response2 := make([]byte, remainingMsgLen)
 	io.ReadFull(r, response2)
-	fmt.Println("Response2:", response2)
+
 	var result = ipdrlib.ParseMessageByType(bytes.NewBuffer(response2), hdr.MessageID, hdr.MessageLen)
 
 	return result, hdr
@@ -242,10 +244,11 @@ func checkDataAvailable(conn net.Conn) {
 					}
 			}
 			fmt.Println("Session: ", sess.SessionType, sess.SessionName, sess.SessionID)
+			flowStart(conn, sessionMap[firstSession].sessionID)
 		}
 		//Start flow on the first session in the session List
 		fmt.Println(sessionMap)
-		flowStart(conn, sessionMap[firstSession].sessionID)
+		//flowStart(conn, sessionMap[firstSession].sessionID)
 	} else if msgHdr.MessageID == ipdrlib.TemplateDataMsgType {
 		data := dataObj.(ipdrlib.TemplateDataIdl)
 		configID = data.ConfigID
@@ -282,7 +285,8 @@ func checkDataAvailable(conn net.Conn) {
 		if sessionMap[msgHdr.SessionID].seq == data.SequenceNum {
 			dataAck(conn, sessionMap[msgHdr.SessionID].seq, msgHdr.SessionID)
 			xdrf.Write(data.Data)
-			xdrlib.ParseData(templateMap[msgHdr.SessionID], data.Data)
+			result := xdrlib.ParseData(templateMap[msgHdr.SessionID], data.Data)
+			fmt.Println(result)
 		}
 
 		tempSession := sessionMap[msgHdr.SessionID]
@@ -310,11 +314,18 @@ func checkDataAvailable(conn net.Conn) {
 	}
 
 }
+func ws() {
+	http.HandleFunc("/sessions", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, sessionMap)
+	})
+	http.ListenAndServe(":8081", nil)
+}
 func main() {
 	// s, schedulerErr := scheduler.NewScheduler(1000)
 	// if schedulerErr != nil  {
 	// 	panic(schedulerErr)
 	// }
+	go ws()
 	var tcpAddr = "192.168.115.231:4737"
 	fmt.Println("ipdrgo ", currentVersion)
 	fmt.Println(runtime.NumCPU())
