@@ -36,17 +36,17 @@ const (
 
 )
 
-func ParseData( fields []ipdrlib.FieldDescriptorIdl, data []byte )(string) {
+func ParseData( fields []ipdrlib.FieldDescriptorIdl, data []byte )(map[string]string,string) {
 	var reclen uint32
 	buf := bytes.NewReader(data)
-
+	result := make(map[string]string)
 	err := binary.Read(buf, binary.BigEndian, &reclen)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return ""
+		return result,""
 	}
 
-	result := make(map[string]string)
+	
 	for _, field:= range fields {
 
 		switch typeID := field.TypeID; typeID {
@@ -177,12 +177,11 @@ func ParseData( fields []ipdrlib.FieldDescriptorIdl, data []byte )(string) {
 	if (err != nil) {
 		fmt.Println(err)
 		fmt.Println("ERROR")
-		return ""
+		return result,""
 	} else {
-		fmt.Println("XXX")
+
 		jsonStr = string(jsondata[:])
-		fmt.Println(jsonStr)
-		fmt.Println("JSON")
+
 	}
-	return jsonStr
+	return result,jsonStr
 }

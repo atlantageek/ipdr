@@ -324,7 +324,7 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 			fmt.Println(connectObj)
 		}
 	case ConnectResponseMsgType:
-		fmt.Println("CONNECT RESPONSE")
+
 		var connectResponseObj ConnectResponseIdl
 		if connectResponseObj.Capabilites| multisessionCapabilities == multisessionCapabilities {
 			fmt.Println("Connect Response Capabilities is MultiSession!")
@@ -345,9 +345,9 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		fmt.Println(errorObj)
 		return errorObj
 	case FlowStartMsgType:
-		fmt.Println("Flow Start")
+
 	case SessionStartMsgType:
-		fmt.Println("Session Start")
+
 		var sessionStartObj SessionStartIdl
 		err := struc.Unpack(packet, &sessionStartObj)
 		if err != nil {
@@ -359,13 +359,13 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 		return sessionStartObj
 
 	case FlowStopMsgType:
-		fmt.Println("Flow Stop")
+
 
 	case SessionStopMsgType:
-		fmt.Println("Session Stop")
+
 
 	case TemplateDataMsgType:
-		fmt.Println("Template Data")
+
 		var templateDataObj TemplateDataIdl
 		err := struc.Unpack(packet, &templateDataObj)
 		if err != nil {
@@ -406,13 +406,13 @@ func ParseMessageByType(packet *bytes.Buffer, messageID uint8, messageLen uint32
 
 		//data.DataRecord, err = packet.ReadString(0)
 	case dataAckMsgType:
-		fmt.Println("Data Acknowledge")
+
 	case RequestMsgType:
-		fmt.Println("REQUEST")
+
 	case ResponseMsgType:
-		fmt.Println("RESPONSE")
+
 	case GetSessionsMsgType:
-		fmt.Println("GET Sessions")
+
 		var dataObj GetSessionsIdl
 
 		err := struc.Unpack(packet, &dataObj)

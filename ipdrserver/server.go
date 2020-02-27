@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"ipdrlib"
@@ -14,7 +15,7 @@ import (
 	"xdrlib"
 
 	//"github.com/prprprus/scheduler"
-	"runtime"
+	//"runtime"
 
 	"github.com/lunixbochs/struc"
 
@@ -35,6 +36,7 @@ type responseResult struct {
 	MessageID uint8
 }
 
+var devices map[string]map[string]string
 var xdrf *os.File
 var configID uint16 = 0
 
@@ -46,7 +48,6 @@ var r io.Reader = nil
 var templateMap = make(map[uint8][]ipdrlib.FieldDescriptorIdl)
 
 func getResponse(conn net.Conn) (interface{}, ipdrlib.IPDRStreamingHeaderIdl) {
-	fmt.Println("-----------------------------------------")
 	response := make([]byte, 8)
 	var messageID uint8 = 0x40
 	var hdr ipdrlib.IPDRStreamingHeaderIdl
@@ -62,15 +63,12 @@ func getResponse(conn net.Conn) (interface{}, ipdrlib.IPDRStreamingHeaderIdl) {
 			panic("Not enough bytes read")
 		}
 		struc.Unpack(bytes.NewBuffer(response), &hdr)
-		fmt.Println(response)
 		messageID = hdr.MessageID
 		if messageID == 0x40 {
-			fmt.Println("Keep Alive")
 			keepAlive(conn)
 		}
 	}
 	var remainingMsgLen = hdr.MessageLen - 8
-	fmt.Println("Remaining message len:", remainingMsgLen)
 	response2 := make([]byte, remainingMsgLen)
 	io.ReadFull(r, response2)
 
@@ -94,7 +92,7 @@ func getMultipleResponses(conn net.Conn) []responseResult {
 	return results
 }
 func connect(conn net.Conn) bool {
-	fmt.Println("Sending Connect")
+	devices = make(map[string]map[string]string)
 	var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
 		Version:      2,
 		MessageID:    5,
@@ -136,7 +134,6 @@ func connect(conn net.Conn) bool {
 
 }
 func getSessions(conn net.Conn) {
-	fmt.Println("Sending Get Sessions")
 	var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
 		Version:      2,
 		MessageID:    0x14,
@@ -150,12 +147,10 @@ func getSessions(conn net.Conn) {
 
 	result := ipdrlib.GetSessions(hdrObj, getSessionsObj)
 
-	fmt.Println(result)
 	conn.Write(result.Bytes())
 
 }
 func flowStart(conn net.Conn, sessionID uint8) {
-	fmt.Println("Sending Flow Start")
 
 	var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
 		Version:      2,
@@ -169,7 +164,6 @@ func flowStart(conn net.Conn, sessionID uint8) {
 
 }
 func finalTemplateData(conn net.Conn, sessionID uint8) bool {
-	fmt.Println("SendingFinal Template")
 
 	var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
 		Version:      2,
@@ -186,7 +180,6 @@ func finalTemplateData(conn net.Conn, sessionID uint8) bool {
 }
 
 func keepAlive(conn net.Conn) {
-	fmt.Println("Sending Keep Alive")
 	var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
 		Version:      2,
 		MessageID:    0x40,
@@ -198,7 +191,6 @@ func keepAlive(conn net.Conn) {
 	conn.Write(result.Bytes())
 }
 func dataAck(conn net.Conn, sequenceNum uint64, sessionID uint8) {
-	fmt.Println("Sending data Ack")
 	var hdrObj = ipdrlib.IPDRStreamingHeaderIdl{
 		Version:      2,
 		MessageID:    0x21,
@@ -210,8 +202,7 @@ func dataAck(conn net.Conn, sequenceNum uint64, sessionID uint8) {
 		ConfigID:    configID,
 		SequenceNum: sequenceNum,
 	}
-	fmt.Println("Config ID:", configID)
-	fmt.Println("Sequence Num:", sequenceNum)
+
 	result := ipdrlib.DataAck(hdrObj, dataAckObj)
 
 	conn.Write(result.Bytes())
@@ -228,7 +219,6 @@ func checkDataAvailable(conn net.Conn) {
 		var firstSession uint8 = 255
 		sessions := dataObj.(ipdrlib.GetSessionsResponseIdl)
 		//sessionID = sessions.SessionBlocks[1].SessionID
-		fmt.Println("SESSIONS AVAIL")
 		for i := 0; i < len(sessions.SessionBlocks); i++ {
 
 			sess := sessions.SessionBlocks[i]
@@ -252,10 +242,8 @@ func checkDataAvailable(conn net.Conn) {
 	} else if msgHdr.MessageID == ipdrlib.TemplateDataMsgType {
 		data := dataObj.(ipdrlib.TemplateDataIdl)
 		configID = data.ConfigID
-		fmt.Println(dataObj)
-		fmt.Println("Config id:", configID)
+
 		templateMap[msgHdr.SessionID] = data.ResultTemplates[0].FieldDescriptors
-		fmt.Println(data.ResultTemplates[0].FieldDescriptors)
 		finalTemplateData(conn, msgHdr.SessionID)
 	} else if msgHdr.MessageID == ipdrlib.SessionStartMsgType {
 		data := dataObj.(ipdrlib.SessionStartIdl)
@@ -279,45 +267,55 @@ func checkDataAvailable(conn net.Conn) {
 		keepAlive(conn)
 	} else if msgHdr.MessageID == ipdrlib.DataMsgType {
 		data := dataObj.(ipdrlib.FullDataIdl)
-		fmt.Println("*************************************************")
-		fmt.Println(data.Data)
+
 		//if deadline.Before(time.Now()) {
 		if sessionMap[msgHdr.SessionID].seq == data.SequenceNum {
 			dataAck(conn, sessionMap[msgHdr.SessionID].seq, msgHdr.SessionID)
 			xdrf.Write(data.Data)
-			result := xdrlib.ParseData(templateMap[msgHdr.SessionID], data.Data)
+			result, resultStr := xdrlib.ParseData(templateMap[msgHdr.SessionID], data.Data)
+			macAddr, ok := result["CmMacAddr"]
+			if ok {
+				devices[macAddr] = result
+			}
 			fmt.Println(result)
+			fmt.Println(resultStr)
 		}
 
 		tempSession := sessionMap[msgHdr.SessionID]
 		tempSession.seq++
 		sessionMap[msgHdr.SessionID] = tempSession
 
-		//	deadline = time.Now().Add(time.Second * 3)
-		//	fmt.Println("Update:",time.Now(), deadline)
-		//}
-		//data := dataObj.(ipdrlib.DataIdl)
-		// _, err := bufio.NewReader(conn).Peek(1)
-		// if err == bufio.ErrBufferFull {
-		// 	dataAck(conn, data.SequenceNum)
-		// 	fmt.Println("Data Is here with ACK! :", data)
-		// } else {
-		// 	fmt.Println("Data Is here :", data)
-		// }
-
 	} else if msgHdr.MessageID == ipdrlib.ErrorMsgType {
 		data := dataObj.(ipdrlib.ErrorResponseIdl)
-		fmt.Println("*************************************************")
+		fmt.Println("**************ERROR***********************************")
 		fmt.Println(data.Description)
 	} else {
 		fmt.Println("Did Not Handle:", msgHdr.MessageID)
 	}
 
 }
+func index(w http.ResponseWriter, _ *http.Request) {
+	io.WriteString(w, "<html><body>Hello Wurld")
+	io.WriteString(w, "<table border=\"1\"><tr><th>Mac</th> <th>IPv4</th><th>IPv6</th><th>CM Last Registration Time</th><th>Reg Status</th><th>Service Packets Passed</th><th>Service SLA Packets Delayed</th><th>Service Packets Dropped</th></tr>")
+	for k, v := range devices {
+		fmt.Printf("key[%s] value[%s]\n", k, v)
+		fmt.Fprintf(w, "<tr><td> %s</td> <td> %s </td><td> %s </td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",k, v["CmIpv4Addr"], v["CmIpv6Addr"],v["CmLastRegTime"], v["CmRegStatusValue"], v["ServicePktsPassed"], v["ServiceSlaDelayPkts"], v["ServiceSlaDropPkts"])
+	}
+	io.WriteString(w, "</table></body></html>")
+}
 func ws() {
 	http.HandleFunc("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, sessionMap)
 	})
+	http.HandleFunc("/devices", func(w http.ResponseWriter, r *http.Request) {
+		jsonString, err := json.Marshal(devices)
+		if err != nil {
+			fmt.Fprint(w, err)
+		} else {
+			fmt.Fprint(w, string(jsonString))
+		}
+	})
+	http.HandleFunc("/", index)
 	http.ListenAndServe(":8081", nil)
 }
 func main() {
@@ -327,15 +325,14 @@ func main() {
 	// }
 	go ws()
 	var tcpAddr = "192.168.115.231:4737"
-	fmt.Println("ipdrgo ", currentVersion)
-	fmt.Println(runtime.NumCPU())
+
 	var conn, err = net.Dial("tcp", tcpAddr)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	connect(conn)
-	fmt.Println("Running checkDataAvailable")
+
 	r = bufio.NewReader(conn)
 	for {
 		checkDataAvailable(conn)
