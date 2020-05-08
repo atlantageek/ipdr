@@ -232,9 +232,11 @@ func checkDataAvailable(conn net.Conn) {
 						seq:         0,
 						sessionName: sess.SessionName,
 					}
+				fmt.Println("Session: ", sess.SessionType, sess.SessionName, sess.SessionID)
+				flowStart(conn, sessionMap[sess.SessionID].sessionID)
 			}
-			fmt.Println("Session: ", sess.SessionType, sess.SessionName, sess.SessionID)
-			flowStart(conn, sessionMap[firstSession].sessionID)
+			// fmt.Println("Session: ", sess.SessionType, sess.SessionName, sess.SessionID)
+			// flowStart(conn, sessionMap[firstSession].sessionID)
 		}
 		//Start flow on the first session in the session List
 		fmt.Println(sessionMap)
@@ -299,7 +301,8 @@ func index(w http.ResponseWriter, _ *http.Request) {
 	io.WriteString(w, "<table border=\"1\"><tr><th>Mac</th> <th>IPv4</th><th>IPv6</th><th>CM Last Registration Time</th><th>Reg Status</th><th>Service Packets Passed</th><th>Service SLA Packets Delayed</th><th>Service Packets Dropped</th></tr>")
 	for k, v := range devices {
 		fmt.Printf("key[%s] value[%s]\n", k, v)
-		fmt.Fprintf(w, "<tr><td> %s</td> <td> %s </td><td> %s </td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",k, v["CmIpv4Addr"], v["CmIpv6Addr"],v["CmLastRegTime"], v["CmRegStatusValue"], v["ServicePktsPassed"], v["ServiceSlaDelayPkts"], v["ServiceSlaDropPkts"])
+		ipv6 := v["CmIpv6Addr"][0:4] + ":" + v["CmIpv6Addr"][4:8] + ":" + v["CmIpv6Addr"][8:12] + ":" + v["CmIpv6Addr"][12:16] + ":" + v["CmIpv6Addr"][16:20] + ":" + v["CmIpv6Addr"][20:24] + ":" + v["CmIpv6Addr"][24:28] + ":" + v["CmIpv6Addr"][28:32]
+		fmt.Fprintf(w, "<tr><td> %s</td> <td> %s </td><td> %s </td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>", k, v["CmIpv4Addr"], ipv6, v["CmLastRegTime"], v["CmRegStatusValue"], v["ServicePktsPassed"], v["ServiceSlaDelayPkts"], v["ServiceSlaDropPkts"])
 	}
 	io.WriteString(w, "</table></body></html>")
 }
